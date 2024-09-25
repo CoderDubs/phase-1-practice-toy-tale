@@ -3,8 +3,10 @@ TO DO
 2. Hook up a form that enables users to add new toys. Create an event listener
    so that, when the form is submitted, the new toy is persisted to the database
    and a new card showing the toy is added to the DOM
-//add in onwindowload method somehwere
+
+   //add in onwindowload method somehwere to render cards on loadup
 */
+//const { create } = require("jsdom/lib/jsdom/living/generated/Blob");
 
 class card {
   constructor(id, name, image, likes) {
@@ -14,31 +16,58 @@ class card {
     this.likes = likes;
   }
 }
-
-let addToy = false;
 document.addEventListener("DOMContentLoaded", () => {
+  let addToy = false;
   const addBtn = document.querySelector("#new-toy-btn");
   const toyFormContainer = document.querySelector(".container");
   const toysUrl = 'http://localhost:3000/toys';
+  const toyCollection = document.getElementById('toy-collection');
 
+  //fix↓
   addBtn.addEventListener("click", () => {
-    // hide & seek with the form
+    // Toggle form visibility
     addToy = !addToy;
-    if (addToy) {
-      //render toy
-      fetchToys();
-      toyFormContainer.style.display = "block";
-    } else {
-      toyFormContainer.style.display = "none";
+    toyFormContainer.style.display = addToy ? "block" : "none";
+
+    // Only add the event listener once, when the form is first shown
+    if (addToy && !toyFormContainer.dataset.listenerAdded) {
+      const toyForm = document.getElementsByClassName('add-toy-form');
+      const toyNameInput = document.querySelector('#toy-name');
+      const toyImageInput = document.querySelector('#toy-image');
+      
+      // Add the submit event listener once
+      toyForm.addEventListener('submit', async (e) => {
+        e.preventDefault(); // Prevent page reload
+        const newToy = {
+          name: toyNameInput.value,
+          image: toyImageInput.value,
+          likes: 0 // new toys will start with 0 likes
+        };
+
+        try {
+          const response = await fetch(toysUrl, {
+            method: 'POST',
+            headers: {
+              "Content-Type": "application/json",
+              Accept: "application/json"
+            },
+            body: JSON.stringify(newToy)
+          });
+
+          const toy = await response.json();
+          // Add the new toy to the DOM using the createCard function
+          createCard(toy);
+
+          // Clear the form fields after submission
+          toyNameInput.value = '';
+          toyImageInput.value = '';
+        } catch (error) {
+          console.error('Error adding new toy:', error);
+        }
+      });
     }
   });
 
-  let toyData =[];
-  async function fetchToys() {
-    const response = await fetch(toysUrl);
-    const toyData = await response.json();
-    toyData.forEach(toy => createCard(toy));
-  }
   function createCard(toy) {
     // Create a new card with innerHTML to reduce code repetition
     const card = document.createElement('div');
@@ -50,6 +79,6 @@ document.addEventListener("DOMContentLoaded", () => {
       <button class="like-btn" id="${toy.id}">Like ❤️</button>
     `;
     // Append card to toy-collection div
-    document.getElementById('toy-collection').appendChild(card);
+    toyCollection.appendChild(card);
   }
 });
