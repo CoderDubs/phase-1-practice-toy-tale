@@ -1,14 +1,12 @@
-/*
-3. Create an event listener that gives users the ability to click a button to
-   "like" a toy. When the button is clicked, the number of likes should be
-   updated in the database and the updated information should be rendered to the
-   DOMd
-
-patchLikes() seems like a good plan? or 
-is it possible to add the like button event listener and PATCH request inside the
-other event listeners?
-*/
-
+/**
+ * Toy Management App
+ * This script dynamically manages toy cards by fetching, adding, and updating likes.
+ * Key features:
+ * - Fetch and render toy cards from the server on page load.
+ * - Toggle toy form visibility and handle new toy submissions.
+ * - Map all toys using their unique ID for efficient lookups and updates.
+ * - Update toy likes dynamically both on the page and server-side.
+ */
 class card {
   constructor(id, name, image, likes) {
     this.id = id;
@@ -17,18 +15,16 @@ class card {
     this.likes = likes;
   }
 }
+
 document.addEventListener("DOMContentLoaded", () => {
   let addToy = false;
   const addBtn = document.querySelector("#new-toy-btn");
   const toyFormContainer = document.querySelector(".container");
   const toysUrl = 'http://localhost:3000/toys';
   const toyCollection = document.getElementById('toy-collection');
-
+  const toysMap = new Map();
   // Fetch and render toys on page load
   fetchToys();
-  patchLikes();
-  //refresh page
-
   addBtn.addEventListener("click", () => {
     addToy = !addToy;
     toyFormContainer.style.display = addToy ? "block" : "none";
@@ -37,12 +33,11 @@ document.addEventListener("DOMContentLoaded", () => {
       const toyForm = document.getElementsByClassName('add-toy-form')[0];
       const toyNameInput = document.querySelector('input[name="name"]');
       const toyImageInput = document.querySelector('input[name="image"]');
-      
       // Add the submit event listener once
-      toyForm.addEventListener('submit', async (e) => {
+      toyForm.addEventListener('submit', async (e) => {   
         e.preventDefault(); // Prevent page reload
         const newToy = {
-          id: Date.now(),
+          id: String(Date.now()),
           //change in order to access last id easier?
           name: toyNameInput.value,
           image: toyImageInput.value,
@@ -57,6 +52,9 @@ document.addEventListener("DOMContentLoaded", () => {
             body: JSON.stringify(newToy)
           });
           const toy = await response.json();
+          //map each card before creation
+          toysMap.set(toy.id, toy);
+          console.log(toysMap);
           createCard(toy);
           toyForm.reset();
         } catch (error) {
@@ -89,29 +87,47 @@ document.addEventListener("DOMContentLoaded", () => {
         throw new Error(message);
       }
       const toys = await response.json();
-      toys.forEach(toy => createCard(toy));
+      toys.forEach(toy => {
+        toysMap.set(toy.id, toy);
+        createCard(toy);
+      });
     } catch (error) {
       console.error('Error fetching toys:', error);
     }
   }
   async function patchLikes() {
-    document.addEventListener('click', function(event) {
-      if (event.target.classList.contains('like-btn')) { // Check if the clicked element is a like button
-        
-        
+    document.addEventListener('click', async function(event) {
+      if (event.target.classList.contains('like-btn')) {
         const button = event.target;
-        const toyId = button.id; // Retrieve the toy ID from the button
-        
-        
-        //find de wei to calc da like
-        const likesParagraph = button.previousElementSibling;
-        let newNumberOfLikes = parseInt(likesParagraph, 10);
-        
+        const toyId = button.id;
+        const toyCard = toysMap.get(toyId);
+        if (toyCard) {
+          toyCard.likes += 1;
+          const likesParagraph = button.previousElementSibling;
+          likesParagraph.textContent = `${toyCard.likes} Likes`;
+          //debugging
+          //console.log(`Toy ID: ${toyId}`);
+          //console.log(`Current Likes: ${toyCard.likes}`);
+          try {
+            const response = await fetch(`http://localhost:3000/toys/${toyId}`, {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                "likes": toyCard.likes })
+            });
+            if (!response.ok) {
+              throw new Error(`Failed to update likes for Toy ID ${toyId}`);
+            }
 
-        console.log(`Toy ID: ${toyId}`);
-        console.log(`Current Likes: ${newNumberOfLikes.textContent}`);
+            console.log(`Successfully updated likes for Toy ID ${toyId} on the server.`);
+          } catch (error) {
+            console.error(error);
+          }
+        } else {
+          console.error(`Toy with ID ${toyId} not found.`);
+        }
       }
-    
     });
   }
+  patchLikes();
 });
